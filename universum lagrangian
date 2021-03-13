@@ -1,0 +1,153 @@
+%   This is universum based Lagrangian twin bounded SVM method for EEG classification
+%   Solution of two minimization problems are solved.
+ function [accuracy,obs1,classifier,time, iter1, iter2]= ULTBSVM(C,test_data,U,c1, c3, cu,mu,epsilon)
+ % c1, c3 and cu are penalty parameters
+ % mu indicated the kernel parameter
+ %epsilon is the universum tolerance
+ [no_input,no_col]=size(C); %C is the train data
+ obs = C(:,no_col);    
+ A = [];
+ B = [];
+ 
+ itmax = 100; %maximum number of iterations
+	for i = 1:no_input
+    if(obs(i) == 1)
+        A = [A;C(i,1:no_col-1)];
+    else
+        B = [B;C(i,1:no_col-1)];
+	end
+
+	c2 = c1;
+	c4 = c3;
+
+    [m3,n] = size(U);
+    e3 = ones(m3,1); %ones vector
+     
+    [m1,n] = size(A);    
+    e1 = ones(m1,1); %ones vector
+    [m2,n] = size(B);
+    e2 = ones(m2,1);%ones vector
+    m= m1 + m2;
+    C = [A ; B];
+    
+	
+    K=zeros(m1,m);
+    % Gaussian kernel
+    for i=1:m1
+        for j=1:m
+            nom = norm( A(i,:)  - C(j,:)  );
+            K(i,j) = exp( -1/(2*mu*mu) * nom * nom );
+        end
+    end
+       
+    H = [K e1];
+         
+    % Gaussian kernel
+    K=zeros(m2,m);
+    for i=1:m2
+        for j=1:m
+            nom = norm( B(i,:) - C(j,:)  );
+            K(i,j) = exp( -1/(2*mu*mu) * nom * nom );
+        end
+    end
+
+    G = [K e2];
+  
+  % Gaussian kernel
+    K=zeros(m3,m);
+    for i=1:m3
+        for j=1:m
+            nom = norm( U(i,:)  - C(j,:)  );
+            K(i,j) = exp( -1/(2*mu*mu) * nom * nom );
+        end
+    end
+
+    O = [K e3];
+
+    em1 = m+1;
+    beta = 1.9./c1;
+    iter1=0; %iteration
+    iter2=0; %iteration
+	
+    V = inv(c3*speye(m1+m2+1) + H'*H);
+    P1 = G*V*G' + speye(m2)./c1;
+    Q1 = -G*V*O';
+    R1 = -O*V*G';
+    S1 = O*V*O' + speye(m3)./cu;
+    z1 = [ones(m2,1)' (epsilon-1)*ones(m3,1)']';
+    
+    D = inv(c4*speye(m1+m2+1) + G'*G); 
+    P2 = H*D*H' + speye(m1)./c2;
+    Q2 = -H*D*O';
+    R2 = -O*D*H';
+    S2 = O*D*O' + speye(m3)./cu;
+    z2 = [ones(m1,1)' (epsilon-1)*ones(m3,1)']';
+
+	X1 = [P1 Q1; R1 S1];
+    X2 = [P2 Q2; R2 S2];
+    
+    u1 = ones(m2+m3,1);
+	unew1 = z1 + max((X1*u1 - z1 - beta*u1),0); %unew1=alpha1
+    unew1 = X1\unew1;
+
+    while((norm(unew1-u1)>10^-3) && (iter1<=itmax))     
+        iter1 = iter1 + 1
+        u1=unew1;        
+		unew1 = z1 + max((X1*u1 - z1 - beta*u1),0);
+        unew1=X1\unew1;
+    end
+	
+
+    u2 = ones(m1+m3,1);
+	unew2 = z2 + max((X2*u2 - z2 - beta*u2),0); %unew2=alpha2
+    unew2 = X2\unew2;
+
+    while( (norm(unew2-u2)>10^-3) && (iter2<=itmax))     
+        iter2 = iter2 + 1;
+        u2 = unew2;        
+	    unew2 = z2 + max((X2*u2 - z2 - beta*u2),0);
+        unew2=X2\unew2;
+    end
+	
+    time= toc
+    
+    invHTH = inv(H'*H + c3 * speye(em1) );
+    invGTG = inv (G'*G + c4 * speye(em1));
+    w1 = - invHTH * (G' *u1(1:m2)- O'*u1(m2+1:m2+m3));  %w1
+    w2 =  invGTG * (H' *u2(1:m1)- O'*u2(m1+1:m1+m3));	%w2
+    
+    [no_test,no_col] = size(test_data);   
+    ktest = zeros( no_test, no_input ); 
+	
+	% Gaussian kernel
+    for i=1:no_test
+        for j=1:no_input
+            nom = norm( test_data(i,1:no_col-1)  - C(j,:)  );
+            Ker_row(i,j) = exp( -1/(2*mu*mu) * nom * nom );
+            
+        end
+    end
+	 
+     K = [Ker_row ones(no_test,1)];
+     size(K);
+     y1 = K * w1 / norm(w1(1:size(w1,1)-1,:));
+     y2 = K * w2 / norm(w2(1:size(w2,1)-1,:));
+     
+    for i = 1 : no_test
+    if abs(y1(i)) < abs(y2(i))
+        classifier(i) = 1;
+    else
+        classifier(i) = -1;
+    end;
+	end;
+%-----------------------------
+	match = 0.;
+	classifier = classifier';
+	obs1 = test_data(:,no_col);
+
+	for i = 1:no_test
+		if(classifier(i) == obs1(i))
+			match = match+1;
+		end;
+	end;  
+	accuracy=match/size(obs1,1)*100
