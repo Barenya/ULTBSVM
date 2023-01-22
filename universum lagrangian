@@ -1,4 +1,7 @@
 %   This is universum based Lagrangian twin bounded SVM method for EEG classification
+%   These paper should be refered if the code is used -
+%   1. "Kumar, B., & Gupta, D. (2021). Universum based Lagrangian twin bounded support vector machine to classify EEG signals. Computer Methods and Programs in Biomedicine, 208, 106244."
+%   2. "Hazarika, B.B., Gupta, D. & Kumar, B. (2023). EEG signal classification using a novel Universum-based twin parametric-margin support vector machine. Cognitive Computation (Accepted)"
 %   Solution of two minimization problems are solved.
  function [accuracy,obs1,classifier,time, iter1, iter2]= ULTBSVM(C,test_data,U,c1, c3, cu,mu,epsilon)
  % c1, c3 and cu are penalty parameters
